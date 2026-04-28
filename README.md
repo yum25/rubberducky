@@ -1,6 +1,6 @@
 # rubberducky
 
-> Yet another hook for agentic AI
+> Yet another harness for agentic AI calls
 
 Forcing myself to understand agentic AI hooks in order to actually use them. Leverages local ollama models to aide in coding tasks in the terminal.
 
