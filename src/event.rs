@@ -35,6 +35,12 @@ pub enum AppEvent {
     Increment,
     /// Decrement the counter.
     Decrement,
+    /// Change to normal mode
+    NormalMode,
+    /// Change to insert mode
+    InsertMode,
+    /// Change to visual mode
+    VisualMode,
     /// Quit the application.
     Quit,
 }

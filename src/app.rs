@@ -2,6 +2,13 @@ use crate::event::{AppEvent, Event, EventHandler};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 
+#[derive(Debug)]
+pub enum Mode {
+    Normal,
+    Insert,
+    Visual,
+}
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
@@ -9,6 +16,10 @@ pub struct App {
     pub running: bool,
     /// Counter.
     pub counter: u8,
+    /// Vim style modes
+    pub mode: Mode,
+    /// User input.
+    pub query: String,
     /// Event handler.
     pub events: EventHandler,
 }
@@ -18,6 +29,8 @@ impl Default for App {
         Self {
             running: true,
             counter: 0,
+            mode: Mode::Normal,
+            query: String::new(),
             events: EventHandler::new(),
         }
     }
@@ -46,6 +59,9 @@ impl App {
                 Event::App(app_event) => match app_event {
                     AppEvent::Increment => self.increment_counter(),
                     AppEvent::Decrement => self.decrement_counter(),
+                    AppEvent::NormalMode => self.change_mode(Mode::Normal),
+                    AppEvent::InsertMode => self.change_mode(Mode::Insert),
+                    AppEvent::VisualMode => self.change_mode(Mode::Visual),
                     AppEvent::Quit => self.quit(),
                 },
             }
@@ -56,12 +72,15 @@ impl App {
     /// Handles the key events and updates the state of [`App`].
     pub fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
         match key_event.code {
-            KeyCode::Esc | KeyCode::Char('q') => self.events.send(AppEvent::Quit),
+            KeyCode::Char('q') => self.events.send(AppEvent::Quit),
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
             KeyCode::Right => self.events.send(AppEvent::Increment),
             KeyCode::Left => self.events.send(AppEvent::Decrement),
+            KeyCode::Esc => self.events.send(AppEvent::NormalMode),
+            KeyCode::Char('i' | 'I') => self.events.send(AppEvent::InsertMode),
+            KeyCode::Char('v') => self.events.send(AppEvent::VisualMode),
             // Other handlers you could add here.
             _ => {}
         }
@@ -77,6 +96,10 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn change_mode(&mut self, mode: Mode) {
+        self.mode = mode;
     }
 
     pub fn increment_counter(&mut self) {
