@@ -1,39 +1,43 @@
 use ratatui::{
-    buffer::Buffer,
-    layout::{Alignment, Rect},
+    Frame,
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Stylize},
-    widgets::{Block, BorderType, Paragraph, Widget},
+    widgets::{Block, Paragraph, Wrap},
 };
 
 use crate::app::App;
 
-impl Widget for &App {
-    /// Renders the user interface widgets.
-    ///
-    // This is where you add new widgets.
-    // See the following resources:
-    // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
-    // - https://github.com/ratatui/ratatui/tree/master/examples
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered()
-            .title("rubberducky")
-            .title_alignment(Alignment::Center)
-            .border_type(BorderType::Rounded);
+pub fn ui(frame: &mut Frame, app: &App) {
+    let centered = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Fill(1),
+            Constraint::Max(120),
+            Constraint::Fill(1),
+        ])
+        .split(frame.area());
 
-        let text = format!(
-            "This is a tui template.\n\
-                Press `Esc`, `Ctrl-C` or `q` to stop running.\n\
-                Press left and right to increment and decrement the counter respectively.\n\
-                Counter: {}, Mode: {:?}",
-            self.counter, self.mode
-        );
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .split(centered[1]);
 
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .fg(Color::Cyan)
-            .bg(Color::Black)
-            .centered();
+    let block = Block::default()
+        .title("rubberducky")
+        .title_alignment(Alignment::Center);
 
-        paragraph.render(area, buf);
-    }
+    let text = format!("{:?}\n{}", app.mode, app.query);
+
+    let mode = Paragraph::new(text)
+        .block(block)
+        .fg(Color::default())
+        .centered();
+
+    frame.render_widget(mode, chunks[0]);
+
+    let user_input = Paragraph::new(app.query.as_str())
+        .block(Block::new())
+        .wrap(Wrap { trim: true });
+
+    frame.render_widget(user_input, chunks[1]);
 }

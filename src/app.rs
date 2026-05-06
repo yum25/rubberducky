@@ -2,6 +2,8 @@ use crate::event::{AppEvent, Event, EventHandler};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 
+use crate::ui::ui;
+
 #[derive(Debug)]
 pub enum Mode {
     Normal,
@@ -9,18 +11,22 @@ pub enum Mode {
     Visual,
 }
 
+enum Direction {
+    Forwards,
+    Backwards,
+}
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
-    /// Is the application running?
     pub running: bool,
-    /// Counter.
-    pub counter: u8,
-    /// Vim style modes
+
     pub mode: Mode,
-    /// User input.
+    pub cursor: usize,
+    pub sequence: String,
+    pub buffer: String,
+
     pub query: String,
-    /// Event handler.
     pub events: EventHandler,
 }
 
@@ -28,8 +34,10 @@ impl Default for App {
     fn default() -> Self {
         Self {
             running: true,
-            counter: 0,
             mode: Mode::Normal,
+            cursor: 0,
+            sequence: String::new(),
+            buffer: String::new(),
             query: String::new(),
             events: EventHandler::new(),
         }
@@ -45,7 +53,7 @@ impl App {
     /// Run the application's main loop.
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
         while self.running {
-            terminal.draw(|frame| frame.render_widget(&self, frame.area()))?;
+            terminal.draw(|frame| ui(frame, &self))?;
             match self.events.next().await? {
                 Event::Tick => self.tick(),
                 Event::Crossterm(event) => match event {
@@ -57,8 +65,6 @@ impl App {
                     _ => {}
                 },
                 Event::App(app_event) => match app_event {
-                    AppEvent::Increment => self.increment_counter(),
-                    AppEvent::Decrement => self.decrement_counter(),
                     AppEvent::NormalMode => self.change_mode(Mode::Normal),
                     AppEvent::InsertMode => self.change_mode(Mode::Insert),
                     AppEvent::VisualMode => self.change_mode(Mode::Visual),
@@ -70,23 +76,60 @@ impl App {
     }
 
     /// Handles the key events and updates the state of [`App`].
-    pub fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
+    fn handle_key_events(&mut self, key_event: KeyEvent) -> color_eyre::Result<()> {
         match key_event.code {
-            KeyCode::Char('q') => self.events.send(AppEvent::Quit),
             KeyCode::Char('c' | 'C') if key_event.modifiers == KeyModifiers::CONTROL => {
                 self.events.send(AppEvent::Quit)
             }
-            KeyCode::Right => self.events.send(AppEvent::Increment),
-            KeyCode::Left => self.events.send(AppEvent::Decrement),
             KeyCode::Esc => self.events.send(AppEvent::NormalMode),
-            KeyCode::Char('i' | 'I') => self.events.send(AppEvent::InsertMode),
-            KeyCode::Char('v') => self.events.send(AppEvent::VisualMode),
-            // Other handlers you could add here.
-            _ => {}
+            _ => match self.mode {
+                Mode::Normal => self.handle_normal_mode(key_event),
+                Mode::Insert => self.handle_insert_mode(key_event),
+                Mode::Visual => self.handle_visual_mode(key_event),
+            },
         }
         Ok(())
     }
 
+    fn move_cursor(&mut self, delta: usize, direction: Direction) {
+        match direction {
+            Direction::Forwards => {
+                self.cursor = self.cursor.saturating_add(delta).min(self.query.len());
+            }
+            Direction::Backwards => {
+                self.cursor = self.cursor.saturating_sub(delta).min(self.query.len());
+            }
+        }
+    }
+
+    fn handle_normal_mode(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.events.send(AppEvent::Quit),
+            KeyCode::Char('i' | 'I') => self.events.send(AppEvent::InsertMode),
+            KeyCode::Char('v') => self.events.send(AppEvent::VisualMode),
+            KeyCode::Char('d' | 'D') => self.handle_deletion(),
+            _ => {}
+        }
+    }
+
+    fn handle_insert_mode(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char(c) => {
+                self.query.insert(self.cursor, c);
+                self.move_cursor(1, Direction::Forwards);
+            }
+            KeyCode::Enter => self.query.push('\n'),
+            KeyCode::Backspace => {
+                self.query.pop();
+                self.move_cursor(1, Direction::Backwards);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_visual_mode(&mut self, key_event: KeyEvent) {}
+
+    fn handle_deletion(&mut self) {}
     /// Handles the tick event of the terminal.
     ///
     /// The tick event is where you can update the state of your application with any logic that
@@ -100,13 +143,5 @@ impl App {
 
     pub fn change_mode(&mut self, mode: Mode) {
         self.mode = mode;
-    }
-
-    pub fn increment_counter(&mut self) {
-        self.counter = self.counter.saturating_add(1);
-    }
-
-    pub fn decrement_counter(&mut self) {
-        self.counter = self.counter.saturating_sub(1);
     }
 }
