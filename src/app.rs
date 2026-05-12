@@ -36,12 +36,9 @@ pub struct App {
     pub running: bool,
 
     pub mode: Mode,
-    pub cursor: usize,
-    pub sequence: String,
     pub buffer: String,
 
     pub textarea: TextArea<'static>,
-    pub query: String,
     pub events: EventHandler,
 }
 
@@ -50,15 +47,13 @@ impl Default for App {
         let mut textarea = TextArea::default();
         textarea.set_wrap_mode(ratatui_textarea::WrapMode::Word);
         textarea.set_cursor_style(Mode::Normal.cursor_style());
+        textarea.set_cursor_line_style(Style::default());
 
         Self {
             running: true,
             mode: Mode::Normal,
-            cursor: 0,
-            sequence: String::new(),
             buffer: String::new(),
             textarea,
-            query: String::new(),
             events: EventHandler::new(),
         }
     }
@@ -87,11 +82,16 @@ impl App {
                 Event::App(app_event) => match app_event {
                     AppEvent::NormalMode => {
                         self.change_mode(Mode::Normal);
+                        self.textarea.cancel_selection();
                     }
                     AppEvent::InsertMode => {
                         self.change_mode(Mode::Insert);
+                        self.textarea.cancel_selection();
                     }
-                    AppEvent::VisualMode => self.change_mode(Mode::Visual),
+                    AppEvent::VisualMode => {
+                        self.change_mode(Mode::Visual);
+                        self.textarea.start_selection();
+                    }
                     AppEvent::Quit => self.quit(),
                 },
             }
@@ -110,31 +110,15 @@ impl App {
                 Mode::Normal => self.handle_normal_mode(Input::from(key_event)),
                 Mode::Insert => self.handle_insert_mode(Input::from(key_event)),
                 Mode::Visual => self.handle_visual_mode(Input::from(key_event)),
-                _ => {}
+                Mode::Replace(bool) => self.handle_replace(Input::from(key_event), bool),
+                Mode::Operator(c) => self.handle_operation(Input::from(key_event), c),
             },
         }
         Ok(())
     }
 
-    fn handle_normal_mode(&mut self, input: Input) {
+    fn handle_traversal(&mut self, input: Input) {
         match input {
-            Input {
-                key: Key::Char('q'),
-                ..
-            } => self.events.send(AppEvent::Quit),
-            Input {
-                key: Key::Char('i' | 'I'),
-                ..
-            } => self.events.send(AppEvent::InsertMode),
-            Input {
-                key: Key::Char('v'),
-                ..
-            } => self.events.send(AppEvent::VisualMode),
-            // Handle directional inputs
-            Input {
-                key: Key::Char('d' | 'D'),
-                ..
-            } => self.handle_deletion(),
             Input {
                 key: Key::Char('h'),
                 ..
@@ -171,7 +155,105 @@ impl App {
                 key: Key::Char('$'),
                 ..
             } => self.textarea.move_cursor(CursorMove::End),
+            Input {
+                key: Key::Char('{'),
+                ..
+            } => self.textarea.move_cursor(CursorMove::ParagraphBack),
+            Input {
+                key: Key::Char('}'),
+                ..
+            } => self.textarea.move_cursor(CursorMove::ParagraphForward),
             _ => {}
+        }
+    }
+
+    fn handle_normal_mode(&mut self, input: Input) {
+        match input {
+            Input {
+                key: Key::Char('q'),
+                ..
+            } => self.events.send(AppEvent::Quit),
+            Input {
+                key: Key::Char('i'),
+                ..
+            } => self.events.send(AppEvent::InsertMode),
+            Input {
+                key: Key::Char('I'),
+                ..
+            } => {
+                self.events.send(AppEvent::InsertMode);
+                self.textarea.move_cursor(CursorMove::Head);
+            }
+            Input {
+                key: Key::Char('a'),
+                ..
+            } => {
+                self.events.send(AppEvent::InsertMode);
+                if Self::is_before_line_end(&self.textarea) {
+                    self.textarea.move_cursor(CursorMove::Forward);
+                }
+            }
+            Input {
+                key: Key::Char('A'),
+                ..
+            } => {
+                self.events.send(AppEvent::InsertMode);
+                self.textarea.move_cursor(CursorMove::End);
+            }
+            Input {
+                key: Key::Char('o'),
+                ..
+            } => {
+                self.events.send(AppEvent::InsertMode);
+                self.textarea.move_cursor(CursorMove::End);
+                self.textarea.insert_newline();
+            }
+            Input {
+                key: Key::Char('O'),
+                ..
+            } => {
+                self.events.send(AppEvent::InsertMode);
+                self.textarea.move_cursor(CursorMove::Head);
+                self.textarea.insert_newline();
+                self.textarea.move_cursor(CursorMove::Up);
+            }
+            Input {
+                key: Key::Char('v'),
+                ..
+            } => self.events.send(AppEvent::VisualMode),
+            Input {
+                key: Key::Char('r'),
+                ctrl: false,
+                ..
+            } => self.change_mode(Mode::Replace(false)),
+            Input {
+                key: Key::Char('R'),
+                ..
+            } => self.change_mode(Mode::Replace(true)),
+            Input {
+                key: Key::Char(op @ ('y' | 'c' | 'd')),
+                ..
+            } => self.change_mode(Mode::Operator(op)),
+            Input {
+                key: Key::Char('u' | 'U'),
+                ..
+            } => {
+                self.textarea.undo();
+            }
+            Input {
+                key: Key::Char('r'),
+                ctrl: true,
+                ..
+            } => {
+                self.textarea.redo();
+            }
+            Input {
+                key: Key::Char('p'),
+                ..
+            } => {
+                self.textarea.paste();
+            }
+            _ => self.handle_traversal(input),
         }
     }
 
@@ -179,10 +261,76 @@ impl App {
         self.textarea.input_without_shortcuts(input);
     }
 
-    fn handle_visual_mode(&mut self, input: Input) {}
+    fn handle_visual_mode(&mut self, input: Input) {
+        match input {
+            Input {
+                key: Key::Char('v'),
+                ..
+            } => {
+                self.textarea.cancel_selection();
+                self.events.send(AppEvent::NormalMode);
+            }
+            _ => self.handle_traversal(input),
+        }
+    }
 
-    fn handle_deletion(&mut self) {}
+    fn handle_replace(&mut self, input: Input, replace_mode: bool) {
+        if let Key::Char(c) = input.key {
+            // Replace the character under the cursor
+            if Self::is_before_line_end(&self.textarea)
+                || self.textarea.lines()[self.textarea.cursor().0].len() == self.textarea.cursor().1
+            {
+                self.textarea.delete_next_char();
+                self.textarea.insert_char(c);
+            }
 
+            if !replace_mode {
+                self.events.send(AppEvent::NormalMode);
+            }
+        }
+    }
+
+    fn handle_operation(&mut self, input: Input, op: char) {
+        match input {
+            Input {
+                key: Key::Char('y' | 'c' | 'd'),
+                ..
+            } => {
+                self.textarea.move_cursor(CursorMove::Head);
+                self.textarea.start_selection();
+                self.textarea.move_cursor(CursorMove::End);
+            }
+            _ => {
+                self.textarea.start_selection();
+                self.handle_traversal(input)
+            }
+        }
+        match op {
+            'y' => {
+                self.textarea.copy();
+                self.events.send(AppEvent::NormalMode);
+            }
+            'c' => {
+                self.textarea.cut();
+                self.events.send(AppEvent::InsertMode);
+            }
+            'd' => {
+                self.textarea.cut();
+                self.events.send(AppEvent::NormalMode);
+            }
+            _ => {}
+        }
+    }
+
+    fn change_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        self.textarea.set_cursor_style(self.mode.cursor_style());
+    }
+
+    fn is_before_line_end(textarea: &TextArea<'static>) -> bool {
+        let cursor = textarea.cursor();
+        cursor.1 < textarea.lines()[cursor.0].len().saturating_sub(1)
+    }
     /// Handles the tick event of the terminal.
     ///
     /// The tick event is where you can update the state of your application with any logic that
@@ -192,10 +340,5 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
-    }
-
-    pub fn change_mode(&mut self, mode: Mode) {
-        self.mode = mode;
-        self.textarea.set_cursor_style(self.mode.cursor_style());
     }
 }
