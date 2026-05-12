@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Stylize},
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Block, Paragraph},
 };
 
 use crate::app::App;
@@ -35,9 +35,5 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     frame.render_widget(mode, chunks[0]);
 
-    let user_input = Paragraph::new(app.query.as_str())
-        .block(Block::new())
-        .wrap(Wrap { trim: true });
-
-    frame.render_widget(user_input, chunks[1]);
+    frame.render_widget(&app.textarea, chunks[1]);
 }
