@@ -111,7 +111,7 @@ impl App {
                 Mode::Insert => self.handle_insert_mode(Input::from(key_event)),
                 Mode::Visual => self.handle_visual_mode(Input::from(key_event)),
                 Mode::Replace(bool) => self.handle_replace(Input::from(key_event), bool),
-                Mode::Operator(c) => self.handle_operation(Input::from(key_event), c),
+                Mode::Operator(c) => self.handle_operation_pending(Input::from(key_event), c),
             },
         }
         Ok(())
@@ -218,6 +218,18 @@ impl App {
                 self.textarea.move_cursor(CursorMove::Up);
             }
             Input {
+                key: Key::Char('x'),
+                ..
+            } => {
+                self.textarea.delete_next_char();
+            }
+            Input {
+                key: Key::Char('X'),
+                ..
+            } => {
+                self.textarea.delete_char();
+            }
+            Input {
                 key: Key::Char('v'),
                 ..
             } => self.events.send(AppEvent::VisualMode),
@@ -270,6 +282,21 @@ impl App {
                 self.textarea.cancel_selection();
                 self.events.send(AppEvent::NormalMode);
             }
+            Input {
+                key: Key::Char('u' | 'U'),
+                ..
+            } => self.events.send(AppEvent::NormalMode),
+            Input {
+                key: Key::Char(op @ ('y' | 'c' | 'd')),
+                ..
+            } => self.handle_operation(op),
+            Input {
+                key: Key::Char('p'),
+                ..
+            } => {
+                self.textarea.paste();
+                self.events.send(AppEvent::NormalMode);
+            }
             _ => self.handle_traversal(input),
         }
     }
@@ -290,7 +317,7 @@ impl App {
         }
     }
 
-    fn handle_operation(&mut self, input: Input, op: char) {
+    fn handle_operation_pending(&mut self, input: Input, op: char) {
         match input {
             Input {
                 key: Key::Char('y' | 'c' | 'd'),
@@ -305,6 +332,11 @@ impl App {
                 self.handle_traversal(input)
             }
         }
+
+        self.handle_operation(op);
+    }
+
+    fn handle_operation(&mut self, op: char) {
         match op {
             'y' => {
                 self.textarea.copy();
