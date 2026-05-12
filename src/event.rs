@@ -31,13 +31,9 @@ pub enum Event {
 /// You can extend this enum with your own custom events.
 #[derive(Clone, Debug)]
 pub enum AppEvent {
-    /// Change to normal mode
     NormalMode,
-    /// Change to insert mode
     InsertMode,
-    /// Change to visual mode
     VisualMode,
-    /// Quit the application.
     Quit,
 }
 
