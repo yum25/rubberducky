@@ -1,12 +1,13 @@
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     widgets::{Block, Borders},
 };
 use std::fmt;
 
 use crate::app::App;
 use crate::app::Mode;
+use crate::components::message::Message;
 
 impl Mode {
     fn block<'a>(&self) -> Block<'a> {
@@ -16,7 +17,7 @@ impl Mode {
             Self::Visual => "type y to yank, type d to delete, type Esc to back to normal mode",
             Self::Operator(_) => "move cursor to apply operator",
         };
-        let title = format!("{} MODE ({})", self, help);
+        let title = format!("{} MODE {}", self, help);
         Block::default().borders(Borders::ALL).title(title)
     }
 }
@@ -33,6 +34,10 @@ impl fmt::Display for Mode {
     }
 }
 
+impl<'a> Message<'a> {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, focused: bool) {}
+}
+
 pub fn ui(frame: &mut Frame, app: &App) {
     let centered = Layout::default()
         .direction(Direction::Horizontal)
@@ -43,11 +48,16 @@ pub fn ui(frame: &mut Frame, app: &App) {
         ])
         .split(frame.area());
 
+    let line_count = app.user_input.num_lines() as u16;
+    let min_height = 3; // minimum height including borders
+    let max_height = 10; // maximum before scrolling
+    let height = line_count.clamp(min_height, max_height);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(2),
-            Constraint::Min(1),
+            Constraint::Length(height),
             Constraint::Fill(1),
             Constraint::Length(1),
         ])
@@ -59,6 +69,6 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     frame.render_widget(block, chunks[0]);
 
-    frame.render_widget(&app.textarea, chunks[1]);
+    frame.render_widget(app.user_input.get_block(), chunks[1]);
     frame.render_widget(app.mode.block(), chunks[3]);
 }

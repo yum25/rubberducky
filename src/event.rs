@@ -34,6 +34,9 @@ pub enum AppEvent {
     NormalMode,
     InsertMode,
     VisualMode,
+    ReplaceMode(bool),
+    OperationMode(char),
+    NoOp,
     Quit,
 }
 
