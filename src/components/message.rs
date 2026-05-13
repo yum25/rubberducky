@@ -53,6 +53,14 @@ impl<'a> Message<'a> {
         self.textarea.cancel_selection();
     }
 
+    pub fn revoke_write_access(&mut self) {
+        self.access = Access::ReadOnly;
+    }
+
+    pub fn grant_write_access(&mut self) {
+        self.access = Access::Writeable;
+    }
+
     pub fn handle_key_event(&mut self, mode: &Mode, input: Input) -> AppEvent {
         match mode {
             Mode::Normal => self.handle_normal_mode(input),
@@ -216,6 +224,9 @@ impl<'a> Message<'a> {
                 self.textarea.paste();
                 AppEvent::NoOp
             }
+            Input {
+                key: Key::Enter, ..
+            } => AppEvent::Submit,
             _ => {
                 self.handle_traversal(input);
                 AppEvent::NoOp
@@ -319,4 +330,3 @@ impl<'a> Message<'a> {
         cursor.1 < textarea.lines()[cursor.0].len().saturating_sub(1)
     }
 }
-

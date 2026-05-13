@@ -35,7 +35,9 @@ impl fmt::Display for Mode {
 }
 
 impl<'a> Message<'a> {
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, focused: bool) {}
+    pub fn render(&self, frame: &mut Frame, area: Rect, focused: bool) {}
+
+    pub fn render_input(&self, frame: &mut Frame, area: Rect) {}
 }
 
 pub fn ui(frame: &mut Frame, app: &App) {
@@ -57,8 +59,8 @@ pub fn ui(frame: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(2),
-            Constraint::Length(height),
             Constraint::Fill(1),
+            Constraint::Length(height),
             Constraint::Length(1),
         ])
         .split(centered[1]);
@@ -69,6 +71,16 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     frame.render_widget(block, chunks[0]);
 
-    frame.render_widget(app.user_input.get_block(), chunks[1]);
+    let constraints: Vec<Constraint> = app.messages.iter().map(|_| Constraint::Min(1)).collect();
+    for (i, message) in app.messages.iter().enumerate() {
+        message.render(frame, chunks[1], false);
+    }
+
+    let line_count = app.user_input.num_lines() as u16;
+    let min_height = 3;
+    let max_height = 10;
+    let height = line_count.clamp(min_height, max_height);
+
+    frame.render_widget(app.user_input.get_block(), chunks[2]);
     frame.render_widget(app.mode.block(), chunks[3]);
 }

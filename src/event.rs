@@ -37,6 +37,7 @@ pub enum AppEvent {
     ReplaceMode(bool),
     OperationMode(char),
     NoOp,
+    Submit,
     Quit,
 }
 
@@ -47,6 +48,12 @@ pub struct EventHandler {
     sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
+}
+
+impl Default for EventHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EventHandler {

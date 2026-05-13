@@ -36,9 +36,8 @@ pub struct App<'a> {
     pub running: bool,
 
     pub mode: Mode,
-    pub buffer: String,
-
     pub user_input: Message<'a>,
+    pub messages: Vec<Message<'a>>,
     pub events: EventHandler,
 }
 
@@ -47,8 +46,8 @@ impl<'a> Default for App<'a> {
         Self {
             running: true,
             mode: Mode::Normal,
-            buffer: String::new(),
             user_input: Message::new(),
+            messages: Vec::new(),
             events: EventHandler::new(),
         }
     }
@@ -93,6 +92,10 @@ impl<'a> App<'a> {
                     }
                     AppEvent::OperationMode(char) => {
                         self.change_mode(Mode::Operator(char));
+                    }
+                    AppEvent::Submit => {
+                        self.messages.push(self.user_input);
+                        self.user_input = Message::new();
                     }
                     AppEvent::Quit => self.quit(),
                     AppEvent::NoOp => {}
