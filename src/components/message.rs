@@ -45,6 +45,10 @@ impl<'a> Message<'a> {
         self.textarea.set_cursor_style(style);
     }
 
+    pub fn clear_cursor_style(&mut self) {
+        self.textarea.set_cursor_style(Style::default());
+    }
+
     pub fn start_selection(&mut self) {
         self.textarea.start_selection();
     }

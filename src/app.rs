@@ -62,7 +62,7 @@ impl<'a> App<'a> {
     /// Run the application's main loop.
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
         while self.running {
-            terminal.draw(|frame| ui(frame, &self))?;
+            terminal.draw(|frame| ui(frame, &mut self))?;
             match self.events.next().await? {
                 Event::Tick => self.tick(),
                 Event::Crossterm(event) => match event {
@@ -94,8 +94,11 @@ impl<'a> App<'a> {
                         self.change_mode(Mode::Operator(char));
                     }
                     AppEvent::Submit => {
+                        self.user_input.clear_cursor_style();
+
                         self.messages.push(self.user_input);
                         self.user_input = Message::new();
+                        self.change_mode(Mode::Normal);
                     }
                     AppEvent::Quit => self.quit(),
                     AppEvent::NoOp => {}

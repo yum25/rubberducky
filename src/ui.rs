@@ -1,6 +1,8 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    symbols::border::Set,
     widgets::{Block, Borders},
 };
 use std::fmt;
@@ -8,6 +10,17 @@ use std::fmt;
 use crate::app::App;
 use crate::app::Mode;
 use crate::components::message::Message;
+
+const TAPERED_BORDER: Set = Set {
+    top_left: "▖",
+    bottom_left: "▘",
+    top_right: " ",
+    bottom_right: " ",
+    vertical_left: "▌",
+    vertical_right: " ",
+    horizontal_top: " ",
+    horizontal_bottom: " ",
+};
 
 impl Mode {
     fn block<'a>(&self) -> Block<'a> {
@@ -35,12 +48,32 @@ impl fmt::Display for Mode {
 }
 
 impl<'a> Message<'a> {
-    pub fn render(&self, frame: &mut Frame, area: Rect, focused: bool) {}
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, focused: bool) {
+        let block = if focused {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(TAPERED_BORDER)
+                .border_style(Style::default().fg(Color::Green))
+        } else {
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(TAPERED_BORDER)
+                .border_style(Style::default().fg(Color::White))
+        };
 
-    pub fn render_input(&self, frame: &mut Frame, area: Rect) {}
+        self.textarea.set_block(block);
+        frame.render_widget(&self.textarea, area);
+    }
+
+    pub fn render_input(&mut self, frame: &mut Frame, area: Rect) {
+        let block = Block::default().borders(Borders::ALL);
+
+        self.textarea.set_block(block);
+        frame.render_widget(&self.textarea, area);
+    }
 }
 
-pub fn ui(frame: &mut Frame, app: &App) {
+pub fn ui(frame: &mut Frame, app: &mut App) {
     let centered = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -51,8 +84,8 @@ pub fn ui(frame: &mut Frame, app: &App) {
         .split(frame.area());
 
     let line_count = app.user_input.num_lines() as u16;
-    let min_height = 3; // minimum height including borders
-    let max_height = 10; // maximum before scrolling
+    let min_height = 5;
+    let max_height = 12;
     let height = line_count.clamp(min_height, max_height);
 
     let chunks = Layout::default()
@@ -71,16 +104,19 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     frame.render_widget(block, chunks[0]);
 
-    let constraints: Vec<Constraint> = app.messages.iter().map(|_| Constraint::Min(1)).collect();
-    for (i, message) in app.messages.iter().enumerate() {
-        message.render(frame, chunks[1], false);
+    let constraints: Vec<Constraint> = app
+        .messages
+        .iter()
+        .map(|m| Constraint::Length((m.num_lines() + 2) as u16))
+        .collect();
+    let message_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(chunks[1]);
+    for (i, message) in app.messages.iter_mut().enumerate() {
+        message.render(frame, message_chunks[i], false);
     }
 
-    let line_count = app.user_input.num_lines() as u16;
-    let min_height = 3;
-    let max_height = 10;
-    let height = line_count.clamp(min_height, max_height);
-
-    frame.render_widget(app.user_input.get_block(), chunks[2]);
+    app.user_input.render_input(frame, chunks[2]);
     frame.render_widget(app.mode.block(), chunks[3]);
 }
