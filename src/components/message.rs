@@ -11,8 +11,17 @@ enum Access {
 }
 
 #[derive(Debug)]
+pub enum State {
+    FocusedInput,
+    UnfocusedInput,
+    FocusedOutput,
+    UnfocusedOutput,
+}
+
+#[derive(Debug)]
 pub struct Message<'a> {
     pub textarea: TextArea<'a>,
+    pub state: State,
     access: Access,
 }
 
@@ -31,11 +40,8 @@ impl<'a> Message<'a> {
         Self {
             textarea,
             access: Access::ReadOnly,
+            state: State::FocusedInput,
         }
-    }
-
-    pub fn get_block(&self) -> &TextArea<'a> {
-        &self.textarea
     }
 
     pub fn num_lines(&self) -> usize {
@@ -63,6 +69,22 @@ impl<'a> Message<'a> {
 
     pub fn grant_write_access(&mut self) {
         self.access = Access::Writeable;
+    }
+
+    pub fn focus(&mut self) {
+        match self.state {
+            State::UnfocusedInput => self.state = State::FocusedInput,
+            State::UnfocusedOutput => self.state = State::FocusedOutput,
+            _ => {}
+        }
+    }
+
+    pub fn unfocus(&mut self) {
+        match self.state {
+            State::FocusedInput => self.state = State::UnfocusedInput,
+            State::FocusedOutput => self.state = State::UnfocusedOutput,
+            _ => {}
+        }
     }
 
     pub fn handle_key_event(&mut self, mode: &Mode, input: Input) -> AppEvent {

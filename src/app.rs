@@ -95,6 +95,7 @@ impl<'a> App<'a> {
                     }
                     AppEvent::Submit => {
                         self.user_input.clear_cursor_style();
+                        self.user_input.unfocus();
 
                         self.messages.push(self.user_input);
                         self.user_input = Message::new();
