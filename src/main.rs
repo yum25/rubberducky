@@ -2,6 +2,7 @@ use crate::app::App;
 
 pub mod app;
 pub mod components;
+pub mod constants;
 pub mod event;
 pub mod ui;
 pub mod widgets;

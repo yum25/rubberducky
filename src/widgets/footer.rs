@@ -1,28 +1,39 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    widgets::{Block, Borders, Widget},
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::{Paragraph, Widget},
 };
 use std::fmt;
 
 use crate::app::Mode;
+use crate::constants::symbols::powerline;
 
 impl Widget for &Mode {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        self.block().render(area, buf);
+        self.line().render(area, buf);
     }
 }
 
 impl Mode {
-    pub fn block<'a>(&self) -> Block<'a> {
+    pub fn line<'a>(&self) -> Paragraph<'a> {
         let help = match self {
             Self::Normal => "type q to quit, type i to enter insert mode",
             Self::Replace(_) | Self::Insert => "type Esc to back to normal mode",
             Self::Visual => "type y to yank, type d to delete, type Esc to back to normal mode",
             Self::Operator(_) => "move cursor to apply operator",
         };
-        let title = format!("{} MODE {}", self, help);
-        Block::default().borders(Borders::ALL).title(title)
+
+        let line = Line::from(vec![
+            Span::styled(
+                format!(" {} ", self),
+                Style::new().fg(Color::Black).bg(self.color()).bold(),
+            ),
+            Span::styled(powerline::RIGHT, Style::new().fg(self.color())),
+        ]);
+
+        Paragraph::new(line)
     }
 }
 

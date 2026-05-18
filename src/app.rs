@@ -18,14 +18,18 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub fn cursor_style(&self) -> Style {
-        let color = match self {
-            Self::Normal => Color::Reset,
+    pub fn color(&self) -> Color {
+        match self {
+            Self::Normal => Color::Gray,
             Self::Insert => Color::LightBlue,
             Self::Replace(_) => Color::LightRed,
             Self::Visual => Color::LightYellow,
             Self::Operator(_) => Color::LightGreen,
-        };
+        }
+    }
+
+    pub fn cursor_style(&self) -> Style {
+        let color = self.color();
         Style::default().fg(color).add_modifier(Modifier::REVERSED)
     }
 }
